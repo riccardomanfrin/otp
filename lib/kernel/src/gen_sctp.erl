@@ -942,7 +942,9 @@ peeloff(S, #sctp_assoc_change{assoc_id=AssocId}) when is_port(S) ->
 peeloff(S, AssocId) when is_port(S), is_integer(AssocId) ->
     case inet_db:lookup_socket(S) of
 	{ok,Mod} ->
-	    Mod:peeloff(S, AssocId);
+	    Res = Mod:peeloff(S, AssocId),
+        propagate_tostc(Res, S);
+        
 	Error -> Error
     end.
 
@@ -1364,6 +1366,12 @@ do_connectx(S, Addrs, Service, Opts, Timeout)
     end;
 do_connectx(_S, _Addrs, _Port, _Opts, _Timeout) ->
     badarg.
+
+propagate_tostc({error, _} = Res, _LSock) -> Res;
+propagate_tostc({ok, POSock}, LSock) -> 
+    {ok, ToSTC} = inet:getopts(LSock, [tos, tclass]),
+    ok = inet:setopts(POSock, ToSTC),
+    {ok, ToSTC}.
 
 ensure_sockaddrs(SockAddrs) ->
     ensure_sockaddrs(SockAddrs, 0, []).
